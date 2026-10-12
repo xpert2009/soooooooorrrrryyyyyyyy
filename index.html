@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="hi" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sorry Bhai! 🥺 Maan Jao Na!</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            rose: '#FF6B8B',
+                            purple: '#8A2387',
+                            orange: '#E94057',
+                            yellow: '#F27121',
+                            bgLight: '#FFF5F7'
+                        }
+                    },
+                    fontFamily: {
+                        display: ['Fredoka', 'sans-serif'],
+                        body: ['Outfit', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        #floating-container {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        body.camera-gate-open {
+            overflow: hidden;
+        }
+
+        main {
+            position: relative;
+            z-index: 1;
+        }
+
+        .floating-emoji {
+            position: fixed;
+            pointer-events: none;
+            z-index: 0;
+            animation: floatUp 8s linear infinite;
+        }
+
+        @keyframes floatUp {
+            0% {
+                transform: translateY(105vh) scale(0.8) rotate(0deg);
+                opacity: 0.8;
+            }
+            100% {
+                transform: translateY(-10vh) scale(1.2) rotate(360deg);
+                opacity: 0;
+            }
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+        }
+
+        .personal-note {
+            position: relative;
+            transform: rotate(-1.5deg);
+            box-shadow: 0 12px 24px rgba(115, 75, 28, 0.18);
+            animation: noteLand 650ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+        }
+
+        @keyframes noteLand {
+            from {
+                opacity: 0;
+                transform: translateY(-12px) rotate(0deg);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) rotate(-1.5deg);
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .personal-note {
+                animation: none;
+            }
+        }
+
+        .personal-note::before {
+            content: '';
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            width: 84px;
+            height: 26px;
+            background: rgba(255, 255, 255, 0.62);
+            transform: translateX(-50%) rotate(2deg);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+        }
+
+        .pulse-btn {
+            animation: pulse-glow 2s infinite;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% {
+                box-shadow: 0 0 15px rgba(233, 64, 87, 0.4);
+            }
+            50% {
+                box-shadow: 0 0 30px rgba(233, 64, 87, 0.8);
+            }
+        }
+
+        .stamp-box {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stamp-approved {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-12deg) scale(3);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .stamp-approved.active {
+            opacity: 1;
+            transform: translate(-50%, -50%) rotate(-12deg) scale(1);
+        }
+    </style>
+</head>
+<body class="text-gray-800 pb-16 antialiased selection:bg-brand-rose selection:text-white">
+
+    <div id="floating-container"></div>
+
+    <section id="cameraGate" class="fixed inset-0 z-[60] flex items-center justify-center bg-rose-50/95 backdrop-blur-md p-4" role="dialog" aria-modal="true" aria-labelledby="cameraGateTitle">
+        <div class="glass-card w-full max-w-lg max-h-[95vh] overflow-y-auto rounded-3xl p-6 md:p-8 text-center">
+            <div class="text-5xl mb-3" aria-hidden="true">📸</div>
+            <h1 id="cameraGateTitle" class="font-display text-2xl md:text-3xl font-bold text-gray-800 mb-3">Pehle ek live photo, phir pyaar bhara message</h1>
+            <p class="text-gray-600 text-sm leading-relaxed mb-5">Aage badhne ke liye camera se photo lo aur save karo. Instagram DM kholkar saved photo khud attach karke Send dabana hoga; website photo upload nahi karti.</p>
+            <video id="cameraPreview" class="hidden w-full aspect-video object-cover rounded-2xl bg-gray-900 mb-4" autoplay playsinline muted></video>
+            <img id="capturedPhoto" class="hidden w-full max-h-64 object-contain rounded-2xl bg-gray-100 mb-4" alt="Your photo preview, kept on this device">
+            <canvas id="captureCanvas" class="hidden"></canvas>
+            <input id="phonePhotoInput" class="hidden" type="file" accept="image/*" capture="user" onchange="handlePhonePhoto(event)">
+            <p id="cameraMessage" class="text-sm text-rose-700 mb-4" role="status" aria-live="polite"></p>
+            <div class="flex flex-col sm:flex-row justify-center gap-3">
+                <button id="startCameraButton" onclick="startCamera()" autofocus class="px-6 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow transition-colors">Camera kholo</button>
+                <button id="phonePhotoButton" onclick="document.getElementById('phonePhotoInput').click()" class="hidden px-6 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow transition-colors">Phone se photo lo</button>
+                <button id="capturePhotoButton" onclick="capturePhoto()" class="hidden px-6 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow transition-colors">Photo lo</button>
+                <button id="downloadPhotoButton" onclick="downloadPhoto()" class="hidden px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl shadow transition-colors">Photo save karo</button>
+                <a id="instagramPhotoLink" href="https://ig.me/m/imtanvi001" target="_blank" rel="noopener noreferrer" class="hidden px-6 py-3 bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-bold rounded-xl shadow transition-colors">Instagram DM kholo</a>
+                <button id="retakePhotoButton" onclick="retakePhoto()" class="hidden px-6 py-3 bg-white text-gray-800 font-bold rounded-xl border border-rose-200 hover:bg-rose-50 transition-colors">Dobara lo</button>
+                <button id="continueButton" onclick="continueAfterPhoto()" class="hidden px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow transition-colors">Aage chalo ❤️</button>
+            </div>
+        </div>
+    </section>
+    <script>document.body.classList.add('camera-gate-open');</script>
+
+    <div id="music-control" class="fixed top-5 right-5 z-50" inert>
+        <button id="audioToggle" onclick="toggleAudio()" class="bg-white/90 hover:bg-white text-gray-800 px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2 border border-rose-200 transition-all transform hover:scale-105 active:scale-95">
+            <i id="audioIcon" class="fas fa-volume-mute text-brand-rose text-lg"></i>
+            <span id="audioText" class="text-sm font-semibold">Music: Off</span>
+        </button>
+    </div>
+
+    <!-- Main Container -->
+    <main class="max-w-4xl mx-auto px-4 pt-10 md:pt-14 flex flex-col gap-10" inert>
+
+        <header class="text-center glass-card rounded-3xl p-8 md:p-12 relative overflow-hidden">
+            <div class="absolute -top-10 -left-10 w-32 h-32 bg-rose-300/30 rounded-full blur-2xl"></div>
+            <div class="absolute -bottom-10 -right-10 w-32 h-32 bg-orange-300/30 rounded-full blur-2xl"></div>
+
+            <div class="inline-block px-4 py-1.5 bg-rose-100 text-rose-600 rounded-full text-sm font-bold tracking-wide uppercase mb-4 animate-bounce">
+                🥺 Alert: Critical Apology In Progress 🥺
+            </div>
+
+            <h1 class="font-display text-4xl sm:text-5xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-brand-purple via-brand-orange to-brand-yellow mb-4 leading-tight">
+                Sorry Bhai! 🥺
+            </h1>
+
+            <p class="font-display text-2xl md:text-3xl text-gray-700 font-semibold mb-6">
+                Maan jao na yaarrr! Kab tak gussa rahoge? 💔
+            </p>
+
+            <p class="text-gray-600 max-w-lg mx-auto text-base md:text-lg leading-relaxed">
+                Galti ho gayi re baba! Tu toh mera sabse accha bhai hai na? Chalo ab gussa chhodo aur smile karo! 😊
+            </p>
+        </header>
+
+        <section id="forgive-section" class="glass-card rounded-3xl p-8 text-center relative min-h-[320px] flex flex-col justify-center items-center">
+            <h2 class="font-display text-2xl md:text-3xl font-bold text-gray-800 mb-2">
+                Kya aap apni pyaari behen ko maaf karte hain?
+            </h2>
+            <p class="text-gray-500 text-sm mb-8">Choose wisely! (Warning: "Nahi" wala option thoda chalu hai 😜)</p>
+
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-6 w-full max-w-md relative min-h-[120px]" id="button-wrapper">
+                <!-- YES BUTTON -->
+                <button id="yesBtn" onclick="handleForgive()" class="pulse-btn w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-bold text-xl rounded-2xl shadow-lg transition-all duration-300 transform hover:scale-110 active:scale-95 flex items-center justify-center gap-2 z-20">
+                    <span>Haan, Maaf Kiya ❤️</span>
+                </button>
+
+                <!-- NO BUTTON (Moving/Dodging) -->
+                <button id="noBtn" class="w-full sm:w-auto px-8 py-4 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-lg rounded-2xl shadow transition-all duration-200 z-20">
+                    <span id="noBtnText">Nahi, Abhi Bhi Gussa Hoon 😤</span>
+                </button>
+            </div>
+        </section>
+
+        <section class="glass-card rounded-3xl p-6 md:p-10">
+            <div class="text-center mb-8">
+                <span class="text-3xl">💡</span>
+                <h2 class="font-display text-3xl font-bold text-gray-800 mt-2">
+                    Kyun Maaf Karna Chahiye?
+                </h2>
+                <p class="text-gray-600 text-sm">Top 3 Valid Reasons scientifically proven by me! 😉</p>
+            </div>
+
+            <div class="space-y-4 max-w-2xl mx-auto">
+                <!-- Reason 1 -->
+                <div class="bg-white/80 rounded-2xl p-5 border border-rose-100 shadow-sm hover:shadow-md transition-all">
+                    <div class="flex items-start gap-4">
+                        <div class="p-3 bg-rose-100 text-rose-600 rounded-xl text-xl">
+                            <i class="fas fa-heart-pulse"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-lg text-gray-800">1. Hamari Dosti & Bond Sabse Best Hai! 🤜🤛</h3>
+                            <p class="text-gray-600 text-sm mt-1">
+                                Kitna bhi lad lein, end me toh saath hi rehna hai na. World's best brother status khatam mat hone do!
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reason 2 -->
+                <div class="bg-white/80 rounded-2xl p-5 border border-orange-100 shadow-sm hover:shadow-md transition-all">
+                    <div class="flex items-start gap-4">
+                        <div class="p-3 bg-orange-100 text-orange-600 rounded-xl text-xl">
+                            <i class="fas fa-mug-hot"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-lg text-gray-800">2. Agli Baar Chai & Snacks Meri Taraf Se! ☕🍟</h3>
+                            <p class="text-gray-600 text-sm mt-1">
+                                Treat officially confirmed! Mood banao, jo bologe woh khilaungi / pilaungi. Pure dil se offer hai!
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reason 3 -->
+                <div class="bg-white/80 rounded-2xl p-5 border border-purple-100 shadow-sm hover:shadow-md transition-all">
+                    <div class="flex items-start gap-4">
+                        <div class="p-3 bg-purple-100 text-purple-600 rounded-xl text-xl">
+                            <i class="fas fa-handshake-angle"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-lg text-gray-800">3. Ab Dobara Aisa Nahi Hoga, Promise! 🤝</h3>
+                            <p class="text-gray-600 text-sm mt-1">
+                                Sikho aur aage badho! Pakka promise, agli baar pareshan nahi karungi.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="personal-note max-w-xl w-full mx-auto bg-yellow-100 rounded-sm px-7 py-8 md:px-10 md:py-10 text-center border border-yellow-200">
+            <div class="text-3xl mb-2" aria-hidden="true">🐾</div>
+            <p class="font-display text-sm font-bold uppercase tracking-wide text-rose-600 mb-3">Ek chhota sa note mere kutte bhai ke liye</p>
+            <p class="font-display text-2xl md:text-3xl font-semibold text-gray-800 leading-relaxed">
+                Mere kutte bhai, tum bahut achhe ho.<br>
+                Tum mere pyaare bacche ho.<br>
+                Love you! ❤️
+            </p>
+            <p class="font-display text-sm md:text-base font-semibold text-rose-600 mt-5 pt-4 border-t border-yellow-300">
+                P.S. Gussa thoda kam, pyaar hamesha zyada! 💛
+            </p>
+        </section>
+
+        <section class="glass-card rounded-3xl p-6 md:p-10 text-center relative overflow-hidden">
+            <span class="text-4xl">📜</span>
+            <h2 class="font-display text-3xl font-bold text-gray-800 mt-2 mb-1">
+                Official Peace Treaty
+            </h2>
+            <p class="text-gray-600 text-sm mb-6">Pakka Waada & Dosti Agreement Contract</p>
+
+            <div class="max-w-xl mx-auto bg-amber-50/90 border-2 border-dashed border-amber-300 rounded-2xl p-6 md:p-8 text-left shadow-inner stamp-box relative">
+                
+                <!-- Virtual Stamp -->
+                <div id="stampApproved" class="stamp-approved border-4 border-rose-600 text-rose-600 font-extrabold text-2xl md:text-3xl px-6 py-3 rounded-2xl uppercase tracking-widest bg-white/90 shadow-2xl z-30 pointer-events-none text-center">
+                    STAMP:<br>OFFICIAL PEACE AGREEMENT
+                </div>
+
+                <div class="text-center border-b border-amber-200 pb-4 mb-4">
+                    <h3 class="font-display font-bold text-xl text-amber-900">NO-FIGHTING PACT</h3>
+                    <p class="text-xs text-amber-700">Valid forever and ever across all dimensions</p>
+                </div>
+
+                <div class="space-y-3 text-sm text-amber-900 leading-relaxed font-mono">
+                    <p>1. All current fights stand cancelled immediately.</p>
+                    <p>2. Smiles are restored to 100% capacity.</p>
+                    <p>3. Hugs and high-fives are now mandated.</p>
+                </div>
+
+                <div class="mt-6 pt-4 border-t border-amber-200 flex flex-col sm:flex-row items-center gap-4">
+                    <div class="w-full">
+                        <label class="block text-xs font-bold text-amber-800 uppercase mb-1">Bhai's Signature (Your Name):</label>
+                        <input type="text" id="signerName" placeholder="Type your name here..." class="w-full px-4 py-2.5 rounded-xl border border-amber-300 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 font-semibold text-gray-800">
+                    </div>
+                    <button onclick="signTreaty()" class="w-full sm:w-auto mt-2 sm:mt-5 px-6 py-2.5 bg-amber-700 hover:bg-amber-800 text-white font-bold rounded-xl shadow transition-all whitespace-nowrap">
+                        Sign Treaty 🖋️
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <section id="response-section" class="glass-card rounded-3xl p-6 md:p-10 text-center">
+            <div class="text-4xl mb-2" aria-hidden="true">💌</div>
+            <h2 class="font-display text-2xl md:text-3xl font-bold text-gray-800 mb-2">Apna jawab mujhe bhejo</h2>
+            <p class="text-gray-600 text-sm mb-5">Jawab, naam aur aapka message copy hokar Instagram chat khulega. Wahan paste karke Send dabana hoga.</p>
+            <label for="visitorMessage" class="block text-left text-sm font-semibold text-gray-700 max-w-xl mx-auto mb-2">Kuch aur kehna hai? (optional)</label>
+            <textarea id="visitorMessage" rows="3" maxlength="500" placeholder="Apna pyaara sa reply yahan likho..." class="w-full max-w-xl mx-auto block px-4 py-3 rounded-xl border border-rose-200 bg-white focus:outline-none focus:ring-2 focus:ring-rose-400 text-gray-800"></textarea>
+            <div class="mt-5 flex flex-col items-center gap-3">
+                <button onclick="sendResponseToInstagram()" class="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-rose-600 to-orange-500 hover:from-rose-700 hover:to-orange-600 text-white font-bold rounded-xl shadow-lg transition-colors">Copy reply &amp; open Instagram</button>
+                <a href="https://www.instagram.com/imtanvi001/" target="_blank" rel="noopener noreferrer" class="text-sm font-semibold text-rose-700 underline underline-offset-4">Instagram: @imtanvi001</a>
+                <p id="responseStatus" class="text-sm text-gray-600" role="status" aria-live="polite"></p>
+                <textarea id="responsePreview" class="hidden w-full max-w-xl px-4 py-3 rounded-xl border border-rose-200 bg-white text-gray-800" rows="5" readonly aria-label="Your reply to copy"></textarea>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="text-center text-gray-600 text-sm pt-4">
+            Made with ❤️ for the Best Brother in the World.
+        </footer>
+    </main>
+
+    <!-- Modal for Forgive Celebration -->
+    <div id="celebrationModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
+        <div class="glass-card bg-white rounded-3xl p-8 max-w-md w-full text-center transform scale-90 transition-all duration-300 shadow-2xl relative" id="modalCard">
+            <div class="text-6xl mb-4 animate-bounce">🥳</div>
+            <h3 class="font-display text-3xl font-extrabold text-gray-800 mb-2">Yay! Best Brother Ever! 🎉</h3>
+            <p class="text-gray-600 mb-6 text-lg">
+                Thank you Bhai! Ab chalo jaldi se party mode ON karo! 🍕🍰
+            </p>
+            <p class="text-xs text-rose-500 font-semibold bg-rose-50 py-2 px-4 rounded-xl mb-6">
+                Obligatory party loading... 100% ✨
+            </p>
+            <button onclick="closeModal()" class="w-full py-3.5 bg-gradient-to-r from-rose-500 to-orange-500 text-white font-bold text-lg rounded-xl shadow-lg hover:opacity-95 transition-all">
+                Let's Party! 🎉
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /* Web Audio API Synthesizer */
+        let audioCtx = null;
+        let isPlaying = false;
+        let cameraStream = null;
+        let photoCaptured = false;
+        let capturedPhotoUrl = null;
+        let forgivenessResponse = 'Abhi tak jawab nahi diya';
+        const backgroundMusic = new Audio('./Barsaat - Banjaare (Official Video).mp3');
+        backgroundMusic.loop = true;
+
+        async function startCamera() {
+            const message = document.getElementById('cameraMessage');
+            const video = document.getElementById('cameraPreview');
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                document.getElementById('phonePhotoButton').classList.remove('hidden');
+                message.innerText = 'Is network link par live camera nahi chalega. Phone se photo lo button use karo.';
+                return;
+            }
+
+            try {
+                message.innerText = 'Camera permission ka intezaar hai...';
+                cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+                video.srcObject = cameraStream;
+                await video.play();
+                video.classList.remove('hidden');
+                document.getElementById('startCameraButton').classList.add('hidden');
+                document.getElementById('phonePhotoButton').classList.add('hidden');
+                document.getElementById('capturePhotoButton').classList.remove('hidden');
+                message.innerText = 'Theek lage to Photo lo dabao.';
+            } catch (error) {
+                document.getElementById('phonePhotoButton').classList.remove('hidden');
+                message.innerText = 'Live camera nahi khul saka. Permission allow karo ya Phone se photo lo dabao.';
+            }
+        }
+
+        function stopCamera() {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach((track) => track.stop());
+                cameraStream = null;
+            }
+            document.getElementById('cameraPreview').srcObject = null;
+        }
+
+        function capturePhoto() {
+            const video = document.getElementById('cameraPreview');
+            const canvas = document.getElementById('captureCanvas');
+            const photo = document.getElementById('capturedPhoto');
+
+            if (!video.videoWidth || !video.videoHeight) {
+                document.getElementById('cameraMessage').innerText = 'Camera abhi ready nahi hai. Thodi der baad phir try karo.';
+                return;
+            }
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+            capturedPhotoUrl = canvas.toDataURL('image/jpeg', 0.85);
+            photo.src = capturedPhotoUrl;
+            showCapturedPhoto(photo);
+            photoCaptured = true;
+            stopCamera();
+        }
+
+        function handlePhonePhoto(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (capturedPhotoUrl && capturedPhotoUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(capturedPhotoUrl);
+            }
+            capturedPhotoUrl = URL.createObjectURL(file);
+            const photo = document.getElementById('capturedPhoto');
+            photo.src = capturedPhotoUrl;
+            showCapturedPhoto(photo);
+            photoCaptured = true;
+            stopCamera();
+        }
+
+        function showCapturedPhoto(photo) {
+            photo.classList.remove('hidden');
+            document.getElementById('cameraPreview').classList.add('hidden');
+            document.getElementById('startCameraButton').classList.add('hidden');
+            document.getElementById('phonePhotoButton').classList.add('hidden');
+            document.getElementById('capturePhotoButton').classList.add('hidden');
+            document.getElementById('downloadPhotoButton').classList.remove('hidden');
+            document.getElementById('instagramPhotoLink').classList.remove('hidden');
+            document.getElementById('retakePhotoButton').classList.remove('hidden');
+            document.getElementById('continueButton').classList.remove('hidden');
+            document.getElementById('cameraMessage').innerText = 'Photo save karo, phir Instagram DM kholo aur photo khud attach karke bhejo.';
+        }
+
+        async function downloadPhoto() {
+            const photo = document.getElementById('capturedPhoto');
+            if (!photo.src) {
+                document.getElementById('cameraMessage').innerText = 'Pehle photo lo, phir save kar sakte ho.';
+                return;
+            }
+
+            try {
+                const response = await fetch(photo.src);
+                if (!response.ok) throw new Error(`Photo conversion failed with status ${response.status}`);
+                const blob = await response.blob();
+                const photoUrl = URL.createObjectURL(blob);
+                const extension = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
+                const link = document.createElement('a');
+                link.href = photoUrl;
+                link.download = `love-photo-${Date.now()}.${extension}`;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                setTimeout(() => URL.revokeObjectURL(photoUrl), 1000);
+                document.getElementById('cameraMessage').innerText = 'Photo download start ho gayi. Aapke device par save hogi.';
+            } catch (error) {
+                console.error('Could not download the captured photo:', error);
+                document.getElementById('cameraMessage').innerText = 'Photo save nahi ho saki. Dobara try karo.';
+            }
+        }
+
+        function retakePhoto() {
+            photoCaptured = false;
+            const photo = document.getElementById('capturedPhoto');
+            photo.classList.add('hidden');
+            photo.removeAttribute('src');
+            if (capturedPhotoUrl && capturedPhotoUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(capturedPhotoUrl);
+            }
+            capturedPhotoUrl = null;
+            document.getElementById('phonePhotoInput').value = '';
+            document.getElementById('captureCanvas').width = 0;
+            document.getElementById('captureCanvas').height = 0;
+            document.getElementById('downloadPhotoButton').classList.add('hidden');
+            document.getElementById('instagramPhotoLink').classList.add('hidden');
+            document.getElementById('retakePhotoButton').classList.add('hidden');
+            document.getElementById('continueButton').classList.add('hidden');
+            document.getElementById('startCameraButton').classList.remove('hidden');
+            startCamera();
+        }
+
+        function continueAfterPhoto() {
+            if (!photoCaptured) return;
+            startBackgroundMusic();
+            document.getElementById('cameraGate').classList.add('hidden');
+            document.getElementById('music-control').inert = false;
+            document.querySelector('main').inert = false;
+            document.body.classList.remove('camera-gate-open');
+        }
+
+        async function sendResponseToInstagram() {
+            const signerName = document.getElementById('signerName').value.trim();
+            const visitorMessage = document.getElementById('visitorMessage').value.trim();
+            const response = [
+                'Website reply for @imtanvi001',
+                `Answer: ${forgivenessResponse}`,
+                signerName ? `Name: ${signerName}` : '',
+                visitorMessage ? `Message: ${visitorMessage}` : ''
+            ].filter(Boolean).join('\n');
+            const status = document.getElementById('responseStatus');
+            const preview = document.getElementById('responsePreview');
+
+            window.open('https://ig.me/m/imtanvi001', '_blank', 'noopener,noreferrer');
+            try {
+                await navigator.clipboard.writeText(response);
+                status.innerText = 'Reply copy ho gaya. Instagram chat mein paste karke Send dabao.';
+                preview.classList.add('hidden');
+            } catch (error) {
+                status.innerText = 'Instagram chat khul gaya. Neeche wala reply copy karke paste karo.';
+                preview.value = response;
+                preview.classList.remove('hidden');
+                preview.focus();
+                preview.select();
+            }
+        }
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        async function startBackgroundMusic() {
+            const audioIcon = document.getElementById('audioIcon');
+            const audioText = document.getElementById('audioText');
+
+            try {
+                await backgroundMusic.play();
+                isPlaying = true;
+                audioIcon.className = 'fas fa-volume-up text-brand-rose text-lg';
+                audioText.innerText = 'Music: On';
+                return true;
+            } catch (error) {
+                console.error('Could not play the background music:', error);
+                isPlaying = false;
+                audioIcon.className = 'fas fa-volume-mute text-brand-rose text-lg';
+                audioText.innerText = error.name === 'NotAllowedError' ? 'Tap to Play' : 'Music unavailable';
+                return false;
+            }
+        }
+
+        async function toggleAudio() {
+            if (!isPlaying) {
+                await startBackgroundMusic();
+                return;
+            }
+
+            const audioIcon = document.getElementById('audioIcon');
+            const audioText = document.getElementById('audioText');
+            backgroundMusic.pause();
+            backgroundMusic.currentTime = 0;
+            isPlaying = false;
+            audioIcon.className = 'fas fa-volume-mute text-brand-rose text-lg';
+            audioText.innerText = 'Music: Off';
+        }
+
+        // Happy Synthesizer Melody
+        function playNote(freq, duration, type = 'sine', delay = 0) {
+            if (!audioCtx) return;
+            setTimeout(() => {
+                try {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                    
+                    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + duration);
+                } catch (e) {
+                    console.log(e);
+                }
+            }, delay);
+        }
+
+        function playHappyTune() {
+            initAudio();
+            const notes = [261.63, 329.63, 392.00, 523.25, 392.00, 523.25]; // C E G C G C
+            notes.forEach((note, index) => {
+                playNote(note, 0.25, 'triangle', index * 180);
+            });
+        }
+
+        function playCelebrationFanfare() {
+            initAudio();
+            const notes = [392.00, 392.00, 392.00, 523.25, 659.25, 783.99];
+            notes.forEach((note, index) => {
+                playNote(note, 0.35, 'square', index * 150);
+            });
+        }
+
+        const noBtn = document.getElementById('noBtn');
+        const yesBtn = document.getElementById('yesBtn');
+        const noBtnText = document.getElementById('noBtnText');
+
+        let noClickCount = 0;
+        const funnyTexts = [
+            "Nahi, Abhi Bhi Gussa Hoon 😤",
+            "Aise Kaise Maaf Kardu? 😜",
+            "Arre Pakad Ke Dikhao! 🏃‍♂️",
+            "Bhool Jao! 😂",
+            "Abhi Bhi Nahi! 🙅‍♂️",
+            "Haan Click Karo Yaar! ❤️"
+        ];
+
+        let yesScale = 1;
+
+        function dodgeButton() {
+            noClickCount++;
+            forgivenessResponse = 'Abhi gussa hoon 😤';
+            
+            // Change No button text
+            const textIndex = Math.min(noClickCount, funnyTexts.length - 1);
+            noBtnText.innerText = funnyTexts[textIndex];
+
+            // Grow Yes Button bigger each time!
+            yesScale = Math.min(1 + noClickCount * 0.025, 1.1);
+            yesBtn.style.transform = `scale(${yesScale})`;
+
+            // Make No button dodge
+            const wrapper = document.getElementById('button-wrapper');
+            const rect = wrapper.getBoundingClientRect();
+
+            const x = Math.random() * (window.innerWidth < 640 ? 120 : 250) - (window.innerWidth < 640 ? 60 : 125);
+            const y = Math.random() * 120 - 60;
+
+            noBtn.style.transform = `translate(${x}px, ${y}px)`;
+        }
+
+        // Events for dodging
+        noBtn.addEventListener('mouseover', dodgeButton);
+        noBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            dodgeButton();
+        });
+        noBtn.addEventListener('click', dodgeButton);
+
+        function handleForgive() {
+            forgivenessResponse = 'Haan, maaf kiya ❤️';
+            // Trigger Confetti
+            confetti({
+                particleCount: 120,
+                spread: 80,
+                origin: { y: 0.6 }
+            });
+
+            // Extra multi-stage confetti explosion
+            setTimeout(() => {
+                confetti({
+                    particleCount: 80,
+                    angle: 60,
+                    spread: 55,
+                    origin: { x: 0 }
+                });
+            }, 250);
+
+            setTimeout(() => {
+                confetti({
+                    particleCount: 80,
+                    angle: 120,
+                    spread: 55,
+                    origin: { x: 1 }
+                });
+            }, 400);
+
+            // Play fanfare
+            playCelebrationFanfare();
+
+            // Show Modal
+            const modal = document.getElementById('celebrationModal');
+            const modalCard = document.getElementById('modalCard');
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            modalCard.classList.remove('scale-90');
+            modalCard.classList.add('scale-100');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('celebrationModal');
+            const modalCard = document.getElementById('modalCard');
+            modal.classList.add('opacity-0', 'pointer-events-none');
+            modalCard.classList.remove('scale-100');
+            modalCard.classList.add('scale-90');
+        }
+
+        function signTreaty() {
+            const signerInput = document.getElementById('signerName');
+            const stamp = document.getElementById('stampApproved');
+
+            if (!signerInput.value.trim()) {
+                signerInput.focus();
+                signerInput.classList.add('ring-2', 'ring-rose-500');
+                setTimeout(() => signerInput.classList.remove('ring-2', 'ring-rose-500'), 1500);
+                return;
+            }
+
+            // Stamp Animation Activation
+            stamp.classList.add('active');
+            playCelebrationFanfare();
+
+            confetti({
+                particleCount: 50,
+                spread: 50,
+                origin: { y: 0.7 }
+            });
+        }
+
+        function createFloatingEmojis() {
+            const container = document.getElementById('floating-container');
+            const emojis = ['🥺', '❤️', '🤝', '☕', '✨', '🌸', '💖'];
+
+            for (let i = 0; i < 15; i++) {
+                const span = document.createElement('span');
+                span.className = 'floating-emoji text-2xl md:text-3xl';
+                span.innerText = emojis[Math.floor(Math.random() * emojis.length)];
+                span.style.left = `${Math.random() * 100}vw`;
+                span.style.animationDelay = `${Math.random() * 6}s`;
+                span.style.animationDuration = `${6 + Math.random() * 6}s`;
+                container.appendChild(span);
+            }
+        }
+
+        window.onload = function() {
+            createFloatingEmojis();
+            startBackgroundMusic();
+        };
+    </script>
+</body>
+</html>
